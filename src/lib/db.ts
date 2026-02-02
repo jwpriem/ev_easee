@@ -31,7 +31,14 @@ export async function initializeDatabase() {
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       brand VARCHAR(100) NOT NULL,
       model VARCHAR(100),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      nickname VARCHAR(100),
+      vin VARCHAR(100),
+      encrypted_token TEXT,
+      encrypted_refresh_token TEXT,
+      region VARCHAR(10) DEFAULT 'EU',
+      external_user_id VARCHAR(255),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
   `;
 }
