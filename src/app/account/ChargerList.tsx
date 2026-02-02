@@ -3,50 +3,48 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import AddVehicleModal from "./AddVehicleModal";
+import AddChargerModal from "./AddChargerModal";
 
-interface Vehicle {
+interface Charger {
   id: number;
   brand: string;
-  model: string | null;
-  nickname: string;
-  vin: string | null;
-  region: string;
+  name: string;
+  charger_id: string | null;
   created_at: string;
 }
 
-export default function VehicleList() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+export default function ChargerList() {
+  const [chargers, setChargers] = useState<Charger[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  async function loadVehicles() {
+  async function loadChargers() {
     try {
-      const response = await fetch("/api/vehicles");
+      const response = await fetch("/api/chargers");
       const data = await response.json();
       if (response.ok) {
-        setVehicles(data.vehicles || []);
+        setChargers(data.chargers || []);
       }
     } catch (error) {
-      console.error("Failed to load vehicles:", error);
+      console.error("Failed to load chargers:", error);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadVehicles();
+    loadChargers();
   }, []);
 
-  function handleVehicleAdded() {
-    loadVehicles();
+  function handleChargerAdded() {
+    loadChargers();
   }
 
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-8">
         <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
         </div>
       </div>
     );
@@ -54,7 +52,7 @@ export default function VehicleList() {
 
   return (
     <>
-      {vehicles.length === 0 ? (
+      {chargers.length === 0 ? (
         <div className="bg-white rounded-xl shadow-lg p-8">
           <div className="text-center">
             <div className="mb-6">
@@ -68,21 +66,21 @@ export default function VehicleList() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.5}
-                  d="M8 7h8m-8 4h8m-4 4v3m-6-3h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
                 />
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              No vehicles connected yet
+              No chargers connected yet
             </h2>
             <p className="text-gray-600 mb-8">
-              Connect your electric vehicle to start tracking and managing it.
+              Connect your home charger to monitor and control it.
             </p>
 
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center justify-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center gap-3 bg-green-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl"
             >
               <svg
                 className="h-6 w-6"
@@ -97,31 +95,31 @@ export default function VehicleList() {
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              Add Vehicle
+              Add Charger
             </button>
 
             <div className="mt-8 pt-8 border-t border-gray-200">
               <p className="text-sm text-gray-500">
-                Supported brands: <span className="font-medium">Zeekr</span>
+                Supported brands: <span className="font-medium">Easee</span>
               </p>
             </div>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Vehicle Cards */}
+          {/* Charger Cards */}
           <div className="grid gap-4 md:grid-cols-2">
-            {vehicles.map((vehicle) => (
+            {chargers.map((charger) => (
               <Link
-                key={vehicle.id}
-                href={`/account/vehicles/${vehicle.id}`}
+                key={charger.id}
+                href={`/account/chargers/${charger.id}`}
                 className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer block"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     <Image
-                      src={`/brands/${vehicle.brand.toLowerCase()}.svg`}
-                      alt={vehicle.brand}
+                      src={`/brands/${charger.brand.toLowerCase()}.svg`}
+                      alt={charger.brand}
                       width={48}
                       height={48}
                       className="object-contain"
@@ -129,14 +127,12 @@ export default function VehicleList() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {vehicle.nickname}
+                      {charger.name}
                     </h3>
-                    <p className="text-gray-600">
-                      {vehicle.brand} {vehicle.model || ""}
-                    </p>
-                    {vehicle.vin && (
+                    <p className="text-gray-600">{charger.brand}</p>
+                    {charger.charger_id && (
                       <p className="text-sm text-gray-400">
-                        VIN: ...{vehicle.vin.slice(-6)}
+                        ID: {charger.charger_id}
                       </p>
                     )}
                   </div>
@@ -158,13 +154,13 @@ export default function VehicleList() {
             ))}
           </div>
 
-          {/* Add Another Vehicle Button */}
+          {/* Add Another Charger Button */}
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="w-full bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow border-2 border-dashed border-gray-300 hover:border-blue-500 group"
+            className="w-full bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow border-2 border-dashed border-gray-300 hover:border-green-500 group"
           >
-            <div className="flex items-center justify-center gap-3 text-gray-500 group-hover:text-blue-600">
+            <div className="flex items-center justify-center gap-3 text-gray-500 group-hover:text-green-600">
               <svg
                 className="h-6 w-6"
                 fill="none"
@@ -178,16 +174,16 @@ export default function VehicleList() {
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              <span className="font-semibold">Add Another Vehicle</span>
+              <span className="font-semibold">Add Another Charger</span>
             </div>
           </button>
         </div>
       )}
 
-      <AddVehicleModal
+      <AddChargerModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onVehicleAdded={handleVehicleAdded}
+        onChargerAdded={handleChargerAdded}
       />
     </>
   );
