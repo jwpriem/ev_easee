@@ -6,7 +6,7 @@ export default function Home() {
       <header className="bg-white shadow-sm">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-blue-600">EV Easee</span>
+            <span className="text-2xl font-bold text-green-600">EV Easee</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -17,7 +17,7 @@ export default function Home() {
             </Link>
             <Link
               href="/signup"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
             >
               Sign Up
             </Link>
@@ -28,15 +28,15 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="text-center max-w-3xl">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Manage Your Electric Vehicle
+            Manage Your Home Charger
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Connect and manage your electric vehicles in one place. Track your
-            charging, monitor your battery, and optimize your EV experience.
+            Connect and monitor your EV home charger in one place. Track your
+            charging sessions, power usage, and optimize your charging experience.
           </p>
           <Link
             href="/signup"
-            className="inline-block bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="inline-block bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors"
           >
             Get Started
           </Link>

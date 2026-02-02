@@ -10,18 +10,18 @@ export async function GET() {
     }
 
     const sql = getDb();
-    const vehicles = await sql`
-      SELECT id, brand, model, nickname, vin, region, created_at
-      FROM vehicles
+    const chargers = await sql`
+      SELECT id, brand, name, charger_id, created_at
+      FROM chargers
       WHERE user_id = ${session.userId}
       ORDER BY created_at DESC
     `;
 
-    return NextResponse.json({ vehicles });
+    return NextResponse.json({ chargers });
   } catch (error) {
-    console.error('Get vehicles error:', error);
+    console.error('Get chargers error:', error);
     return NextResponse.json(
-      { error: 'Failed to get vehicles' },
+      { error: 'Failed to get chargers' },
       { status: 500 }
     );
   }
@@ -36,43 +36,40 @@ export async function POST(request: Request) {
 
     const {
       brand,
-      model,
-      nickname,
-      vin,
-      encryptedToken,
+      name,
+      chargerId,
+      encryptedAccessToken,
       encryptedRefreshToken,
-      region = 'EU',
-      externalUserId
     } = await request.json();
 
-    if (!brand || !nickname) {
+    if (!brand || !name) {
       return NextResponse.json(
-        { error: 'Brand and nickname are required' },
+        { error: 'Brand and name are required' },
         { status: 400 }
       );
     }
 
     const sql = getDb();
     const result = await sql`
-      INSERT INTO vehicles (
-        user_id, brand, model, nickname, vin,
-        encrypted_token, encrypted_refresh_token, region, external_user_id
+      INSERT INTO chargers (
+        user_id, brand, name, charger_id,
+        encrypted_access_token, encrypted_refresh_token
       )
       VALUES (
-        ${session.userId}, ${brand}, ${model || null}, ${nickname}, ${vin || null},
-        ${encryptedToken || null}, ${encryptedRefreshToken || null}, ${region}, ${externalUserId || null}
+        ${session.userId}, ${brand}, ${name}, ${chargerId || null},
+        ${encryptedAccessToken || null}, ${encryptedRefreshToken || null}
       )
-      RETURNING id, brand, model, nickname, vin, region, created_at
+      RETURNING id, brand, name, charger_id, created_at
     `;
 
     return NextResponse.json({
       success: true,
-      vehicle: result[0]
+      charger: result[0]
     });
   } catch (error) {
-    console.error('Save vehicle error:', error);
+    console.error('Save charger error:', error);
     return NextResponse.json(
-      { error: 'Failed to save vehicle' },
+      { error: 'Failed to save charger' },
       { status: 500 }
     );
   }

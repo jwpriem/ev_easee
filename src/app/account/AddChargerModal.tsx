@@ -3,49 +3,45 @@
 import { useState } from "react";
 import Image from "next/image";
 
-interface AddVehicleModalProps {
+interface AddChargerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onVehicleAdded: () => void;
+  onChargerAdded: () => void;
 }
 
-type Step = "brands" | "login" | "naming";
+type Step = "brands" | "login" | "select";
 
-interface ZeekrVehicle {
-  vin: string;
-  model: string;
+interface EaseeCharger {
+  id: string;
+  name: string;
 }
 
-export default function AddVehicleModal({
+export default function AddChargerModal({
   isOpen,
   onClose,
-  onVehicleAdded,
-}: AddVehicleModalProps) {
+  onChargerAdded,
+}: AddChargerModalProps) {
   const [step, setStep] = useState<Step>("brands");
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [region, setRegion] = useState<"EU" | "SEA">("EU");
-  const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Store connection data between steps
   const [connectionData, setConnectionData] = useState<{
-    encryptedToken?: string;
+    encryptedAccessToken?: string;
     encryptedRefreshToken?: string;
-    userId?: string;
-    vehicles?: ZeekrVehicle[];
+    chargers?: EaseeCharger[];
   } | null>(null);
-  const [selectedVehicle, setSelectedVehicle] = useState<ZeekrVehicle | null>(
-    null
-  );
+  const [selectedCharger, setSelectedCharger] = useState<EaseeCharger | null>(null);
+  const [customName, setCustomName] = useState("");
 
   const brands = [
     {
-      id: "zeekr",
-      name: "Zeekr",
-      logo: "/brands/zeekr.svg",
+      id: "easee",
+      name: "Easee",
+      logo: "/brands/easee.svg",
       available: true,
     },
   ];
@@ -53,12 +49,12 @@ export default function AddVehicleModal({
   function handleClose() {
     setStep("brands");
     setSelectedBrand(null);
-    setEmail("");
+    setUsername("");
     setPassword("");
-    setNickname("");
+    setCustomName("");
     setError("");
     setConnectionData(null);
-    setSelectedVehicle(null);
+    setSelectedCharger(null);
     onClose();
   }
 
@@ -74,14 +70,13 @@ export default function AddVehicleModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/vehicles/connect", {
+      const response = await fetch("/api/chargers/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: selectedBrand,
-          email,
+          username,
           password,
-          region,
         }),
       });
 
@@ -93,18 +88,20 @@ export default function AddVehicleModal({
       }
 
       setConnectionData({
-        encryptedToken: data.encryptedToken,
+        encryptedAccessToken: data.encryptedAccessToken,
         encryptedRefreshToken: data.encryptedRefreshToken,
-        userId: data.userId,
-        vehicles: data.vehicles,
+        chargers: data.chargers,
       });
 
-      // If vehicles found, select the first one
-      if (data.vehicles && data.vehicles.length > 0) {
-        setSelectedVehicle(data.vehicles[0]);
+      // If chargers found, select the first one
+      if (data.chargers && data.chargers.length > 0) {
+        setSelectedCharger(data.chargers[0]);
+        setCustomName(data.chargers[0].name || "My Easee Charger");
+      } else {
+        setCustomName("My Easee Charger");
       }
 
-      setStep("naming");
+      setStep("select");
     } catch {
       setError("Connection failed. Please try again.");
     } finally {
@@ -118,29 +115,26 @@ export default function AddVehicleModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/vehicles", {
+      const response = await fetch("/api/chargers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: selectedBrand,
-          model: selectedVehicle?.model,
-          nickname,
-          vin: selectedVehicle?.vin,
-          encryptedToken: connectionData?.encryptedToken,
+          name: customName,
+          chargerId: selectedCharger?.id,
+          encryptedAccessToken: connectionData?.encryptedAccessToken,
           encryptedRefreshToken: connectionData?.encryptedRefreshToken,
-          region,
-          externalUserId: connectionData?.userId,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to save vehicle");
+        setError(data.error || "Failed to save charger");
         return;
       }
 
-      onVehicleAdded();
+      onChargerAdded();
       handleClose();
     } catch {
       setError("Failed to save. Please try again.");
@@ -157,9 +151,9 @@ export default function AddVehicleModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold text-gray-900">
-            {step === "brands" && "Add Vehicle"}
-            {step === "login" && `Connect ${selectedBrand}`}
-            {step === "naming" && "Name Your Vehicle"}
+            {step === "brands" && "Add Charger"}
+            {step === "login" && `Connect to ${selectedBrand}`}
+            {step === "select" && "Select Charger"}
           </h2>
           <button
             onClick={handleClose}
@@ -193,7 +187,7 @@ export default function AddVehicleModal({
           {step === "brands" && (
             <div>
               <p className="text-gray-600 mb-6">
-                Select your vehicle brand to connect
+                Select your charger brand to connect
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {brands.map((brand) => (
@@ -205,7 +199,7 @@ export default function AddVehicleModal({
                     disabled={!brand.available}
                     className={`p-6 border-2 rounded-xl flex flex-col items-center gap-3 transition-all ${
                       brand.available
-                        ? "hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
+                        ? "hover:border-green-500 hover:bg-green-50 cursor-pointer"
                         : "opacity-50 cursor-not-allowed"
                     }`}
                   >
@@ -231,35 +225,24 @@ export default function AddVehicleModal({
           {step === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">
               <p className="text-gray-600 mb-4">
-                Enter your Zeekr account credentials
+                Enter your Easee account credentials
               </p>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Region
-                </label>
-                <select
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value as "EU" | "SEA")}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="EU">Europe</option>
-                  <option value="SEA">Southeast Asia / Australia</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Phone Number or Email
                 </label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  placeholder="your-zeekr-email@example.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  placeholder="+31612345678 or email@example.com"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Use your phone number with country code (e.g., +31...) or email
+                </p>
               </div>
 
               <div>
@@ -271,8 +254,8 @@ export default function AddVehicleModal({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  placeholder="Your Zeekr password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  placeholder="Your Easee password"
                 />
               </div>
 
@@ -287,7 +270,7 @@ export default function AddVehicleModal({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
                 >
                   {loading ? "Connecting..." : "Connect"}
                 </button>
@@ -295,31 +278,34 @@ export default function AddVehicleModal({
             </form>
           )}
 
-          {/* Step 3: Naming */}
-          {step === "naming" && (
+          {/* Step 3: Select Charger */}
+          {step === "select" && (
             <form onSubmit={handleSave} className="space-y-4">
               <p className="text-gray-600 mb-4">
-                Connection successful! Give your vehicle a name.
+                Connection successful! Select and name your charger.
               </p>
 
-              {connectionData?.vehicles && connectionData.vehicles.length > 1 && (
+              {connectionData?.chargers && connectionData.chargers.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Vehicle
+                    Select Charger
                   </label>
                   <select
-                    value={selectedVehicle?.vin || ""}
+                    value={selectedCharger?.id || ""}
                     onChange={(e) => {
-                      const vehicle = connectionData.vehicles?.find(
-                        (v) => v.vin === e.target.value
+                      const charger = connectionData.chargers?.find(
+                        (c) => c.id === e.target.value
                       );
-                      setSelectedVehicle(vehicle || null);
+                      setSelectedCharger(charger || null);
+                      if (charger?.name) {
+                        setCustomName(charger.name);
+                      }
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                   >
-                    {connectionData.vehicles.map((v) => (
-                      <option key={v.vin} value={v.vin}>
-                        {v.model} ({v.vin.slice(-6)})
+                    {connectionData.chargers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.id}
                       </option>
                     ))}
                   </select>
@@ -328,18 +314,18 @@ export default function AddVehicleModal({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vehicle Name
+                  Charger Name
                 </label>
                 <input
                   type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  placeholder="e.g., 001, My Zeekr, Family Car"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  placeholder="e.g., Home Charger, Garage"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  This name will help you identify your vehicle
+                  This name will help you identify your charger
                 </p>
               </div>
 
@@ -353,10 +339,10 @@ export default function AddVehicleModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !nickname}
-                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  disabled={loading || !customName}
+                  className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
                 >
-                  {loading ? "Saving..." : "Save Vehicle"}
+                  {loading ? "Saving..." : "Save Charger"}
                 </button>
               </div>
             </form>
