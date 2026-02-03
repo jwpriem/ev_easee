@@ -44,8 +44,6 @@ export async function initializeDatabase() {
       id SERIAL PRIMARY KEY,
       user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
       encrypted_access_token TEXT NOT NULL,
-      encrypted_refresh_token TEXT,
-      token_expires_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )

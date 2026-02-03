@@ -82,51 +82,81 @@ export default function PriceChart() {
   const [notConnected, setNotConnected] = useState(false);
   const [tibberConnected, setTibberConnected] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        // Check Tibber connection status
-        const statusRes = await fetch("/api/tibber/status");
-        const statusData = await statusRes.json();
-
-        if (!statusRes.ok && statusRes.status === 401) {
-          return;
-        }
-
-        setTibberConnected(statusData.connected);
-
-        if (!statusData.connected) {
-          setNotConnected(true);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch prices
-        const response = await fetch("/api/prices");
-        const data = await response.json();
-
-        if (response.status === 400) {
-          setNotConnected(true);
-          return;
-        }
-
-        if (!response.ok) {
-          setError(data.error || "Failed to fetch prices");
-          return;
-        }
-
-        setTodayPrices(data.today || []);
-        setTomorrowPrices(data.tomorrow || []);
-      } catch {
-        setError("Failed to connect to server");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchData();
   }, []);
+
+  async function fetchData() {
+    setLoading(true);
+    setError("");
+    try {
+      const statusRes = await fetch("/api/tibber/status");
+      const statusData = await statusRes.json();
+
+      if (!statusRes.ok && statusRes.status === 401) {
+        return;
+      }
+
+      setTibberConnected(statusData.connected);
+
+      if (!statusData.connected) {
+        setNotConnected(true);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch("/api/prices");
+      const data = await response.json();
+
+      if (response.status === 400) {
+        setNotConnected(true);
+        return;
+      }
+
+      if (!response.ok) {
+        setError(data.error || "Failed to fetch prices");
+        return;
+      }
+
+      setNotConnected(false);
+      setTodayPrices(data.today || []);
+      setTomorrowPrices(data.tomorrow || []);
+    } catch {
+      setError("Failed to connect to server");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveToken(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError("");
+    try {
+      const res = await fetch("/api/tibber/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error || "Failed to save token");
+        return;
+      }
+      setToken("");
+      setTibberConnected(true);
+      setNotConnected(false);
+      await fetchData();
+    } catch {
+      setSaveError("Failed to connect to server");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleDisconnect() {
     setDisconnecting(true);
@@ -148,13 +178,15 @@ export default function PriceChart() {
 
   const chartData = useMemo(() => {
     const allPrices = [...todayPrices, ...tomorrowPrices];
-    const prices = resolution === "15" ? interpolateTo15Min(allPrices) : allPrices;
+    const prices =
+      resolution === "15" ? interpolateTo15Min(allPrices) : allPrices;
 
     const now = new Date();
 
     return prices.map((p): ChartEntry => {
       const startTime = new Date(p.startsAt);
-      const intervalMs = resolution === "15" ? 15 * 60 * 1000 : 60 * 60 * 1000;
+      const intervalMs =
+        resolution === "15" ? 15 * 60 * 1000 : 60 * 60 * 1000;
       const endTime = new Date(startTime.getTime() + intervalMs);
       const isNow = now >= startTime && now < endTime;
 
@@ -199,33 +231,10 @@ export default function PriceChart() {
 
   if (notConnected) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-        <svg
-          className="mx-auto h-16 w-16 text-gray-400 mb-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M13 10V3L4 14h7v7l9-11h-7z"
-          />
-        </svg>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          Connect Your Tibber Account
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Connect your Tibber account to view real-time electricity prices for
-          your home.
-        </p>
-        <a
-          href="/api/tibber/authorize"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-        >
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="text-center mb-6">
           <svg
-            className="h-5 w-5"
+            className="mx-auto h-16 w-16 text-gray-400 mb-4"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -233,12 +242,59 @@ export default function PriceChart() {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+              strokeWidth={1.5}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          Connect Tibber
-        </a>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Connect Your Tibber Account
+          </h2>
+          <p className="text-gray-600 mb-2">
+            Enter your Tibber personal access token to view real-time
+            electricity prices.
+          </p>
+          <p className="text-sm text-gray-500">
+            You can find your token at{" "}
+            <a
+              href="https://developer.tibber.com/settings/access-token"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-600 hover:text-green-700 underline"
+            >
+              developer.tibber.com
+            </a>
+          </p>
+        </div>
+
+        <form onSubmit={handleSaveToken} className="max-w-md mx-auto space-y-4">
+          <div>
+            <label
+              htmlFor="tibber-token"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Personal Access Token
+            </label>
+            <input
+              id="tibber-token"
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="Paste your Tibber access token"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
+            />
+          </div>
+          {saveError && (
+            <p className="text-sm text-red-600">{saveError}</p>
+          )}
+          <button
+            type="submit"
+            disabled={saving || !token.trim()}
+            className="w-full px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? "Connecting..." : "Connect Tibber"}
+          </button>
+        </form>
       </div>
     );
   }
@@ -303,9 +359,7 @@ export default function PriceChart() {
         <div className="bg-white rounded-xl shadow-lg p-4">
           <p className="text-sm text-gray-500">Current Price</p>
           <p className="text-2xl font-bold text-gray-900">
-            {currentPrice
-              ? `€${currentPrice.price.toFixed(4)}`
-              : "—"}
+            {currentPrice ? `\u20AC${currentPrice.price.toFixed(4)}` : "\u2014"}
           </p>
           {currentPrice && (
             <span
@@ -322,21 +376,21 @@ export default function PriceChart() {
         <div className="bg-white rounded-xl shadow-lg p-4">
           <p className="text-sm text-gray-500">Average</p>
           <p className="text-2xl font-bold text-gray-900">
-            €{avgPrice.toFixed(4)}
+            {"\u20AC"}{avgPrice.toFixed(4)}
           </p>
           <p className="text-xs text-gray-400">per kWh</p>
         </div>
         <div className="bg-white rounded-xl shadow-lg p-4">
           <p className="text-sm text-gray-500">Lowest</p>
           <p className="text-2xl font-bold text-green-600">
-            €{minPrice.toFixed(4)}
+            {"\u20AC"}{minPrice.toFixed(4)}
           </p>
           <p className="text-xs text-gray-400">per kWh</p>
         </div>
         <div className="bg-white rounded-xl shadow-lg p-4">
           <p className="text-sm text-gray-500">Highest</p>
           <p className="text-2xl font-bold text-red-600">
-            €{maxPrice.toFixed(4)}
+            {"\u20AC"}{maxPrice.toFixed(4)}
           </p>
           <p className="text-xs text-gray-400">per kWh</p>
         </div>
@@ -399,7 +453,11 @@ export default function PriceChart() {
               data={chartData}
               margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f0f0f0"
+              />
               <XAxis
                 dataKey="time"
                 tick={{ fontSize: 11, fill: "#6b7280" }}
@@ -409,7 +467,9 @@ export default function PriceChart() {
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#6b7280" }}
-                tickFormatter={(value: number) => `€${value.toFixed(2)}`}
+                tickFormatter={(value: number) =>
+                  `\u20AC${value.toFixed(2)}`
+                }
                 tickLine={false}
                 axisLine={false}
                 width={60}
@@ -428,8 +488,11 @@ export default function PriceChart() {
                             </span>
                           )}
                         </p>
-                        <p className="text-lg font-bold" style={{ color: getLevelColor(data.level) }}>
-                          €{data.price.toFixed(4)}/kWh
+                        <p
+                          className="text-lg font-bold"
+                          style={{ color: getLevelColor(data.level) }}
+                        >
+                          {"\u20AC"}{data.price.toFixed(4)}/kWh
                         </p>
                         <p className="text-xs text-gray-500">
                           {data.level.replace(/_/g, " ")}
@@ -451,7 +514,11 @@ export default function PriceChart() {
                   fontSize: 11,
                 }}
               />
-              <Bar dataKey="price" radius={[2, 2, 0, 0]} maxBarSize={resolution === "15" ? 8 : 20}>
+              <Bar
+                dataKey="price"
+                radius={[2, 2, 0, 0]}
+                maxBarSize={resolution === "15" ? 8 : 20}
+              >
                 {chartData.map((entry, index) => (
                   <Cell
                     key={index}
