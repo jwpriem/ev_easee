@@ -57,14 +57,25 @@ export async function GET(request: Request) {
     const prices = await fetchTibberPrices(accessToken);
     const allPrices = [...prices.today, ...prices.tomorrow];
 
+    // Expand hourly prices into 15-minute slots
+    const slots15min = allPrices.flatMap((price) => {
+      const hourStart = new Date(price.startsAt);
+      return [0, 15, 30, 45].map((minuteOffset) => {
+        const slotStart = new Date(hourStart.getTime() + minuteOffset * 60 * 1000);
+        return {
+          startsAt: slotStart.toISOString(),
+          price: price.total,
+          level: price.level,
+        };
+      });
+    });
+
     // Calculate schedule for each schema
     const schedules = schemas.map((schema: Record<string, unknown>) => {
       const maxPrice = parseFloat(schema.max_price as string);
-      const slots = allPrices.map((price) => ({
-        startsAt: price.startsAt,
-        price: price.total,
-        level: price.level,
-        active: price.total <= maxPrice,
+      const slots = slots15min.map((slot) => ({
+        ...slot,
+        active: slot.price <= maxPrice,
       }));
 
       const activeSlots = slots.filter((s) => s.active).length;
@@ -79,8 +90,10 @@ export async function GET(request: Request) {
         enabled: schema.enabled,
         slots,
         summary: {
-          activeHours: activeSlots,
-          totalHours: totalSlots,
+          activeSlots,
+          totalSlots,
+          activeHours: activeSlots / 4,
+          totalHours: totalSlots / 4,
           cheapestPrice: allPrices.length > 0 ? Math.min(...allPrices.map((p) => p.total)) : 0,
           mostExpensivePrice: allPrices.length > 0 ? Math.max(...allPrices.map((p) => p.total)) : 0,
         },
