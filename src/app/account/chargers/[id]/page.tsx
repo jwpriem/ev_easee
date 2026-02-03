@@ -143,9 +143,31 @@ export default function ChargerDetailPage({
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/account" className="text-2xl font-bold text-green-600">
-            EV Easee
-          </Link>
+          <div className="flex items-center gap-8">
+            <Link href="/" className="text-2xl font-bold text-green-600">
+              EV Easee
+            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/account"
+                className="text-green-600 font-medium"
+              >
+                Chargers
+              </Link>
+              <Link
+                href="/prices"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Prices
+              </Link>
+              <Link
+                href="/schema"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Schema
+              </Link>
+            </div>
+          </div>
           <Link
             href="/account"
             className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -163,7 +185,7 @@ export default function ChargerDetailPage({
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to chargers
+            Back
           </Link>
         </nav>
       </header>
