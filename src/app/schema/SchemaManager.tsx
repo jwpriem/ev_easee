@@ -42,6 +42,24 @@ interface Schedule {
   };
 }
 
+interface ApplyResult {
+  schemaId: number;
+  chargerName: string;
+  easeeChargerId: string;
+  currentPrice: number;
+  maxPrice: number;
+  shouldCharge: boolean;
+  action: "start" | "pause" | "none";
+  actionResult: "success" | "error" | "skipped";
+  message: string;
+}
+
+interface ApplyResponse {
+  results: ApplyResult[];
+  currentPrice: number;
+  timestamp: string;
+}
+
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -49,7 +67,11 @@ function formatTime(isoString: string): string {
 
 function formatDate(isoString: string): string {
   const date = new Date(isoString);
-  return date.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+  return date.toLocaleDateString([], {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export default function SchemaManager() {
@@ -64,6 +86,11 @@ export default function SchemaManager() {
   const [maxPrice, setMaxPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  // Apply state
+  const [applying, setApplying] = useState(false);
+  const [applyResults, setApplyResults] = useState<ApplyResponse | null>(null);
+  const [applyError, setApplyError] = useState("");
 
   useEffect(() => {
     loadData();
@@ -155,10 +182,31 @@ export default function SchemaManager() {
     }
   }
 
+  async function handleApply() {
+    setApplying(true);
+    setApplyError("");
+    setApplyResults(null);
+    try {
+      const res = await fetch("/api/schemas/apply", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setApplyError(data.error || "Failed to apply schemas");
+        return;
+      }
+      setApplyResults(data);
+    } catch {
+      setApplyError("Failed to connect to server");
+    } finally {
+      setApplying(false);
+    }
+  }
+
   // Chargers that don't have a schema yet
   const availableChargers = chargers.filter(
     (c) => !schemas.some((s) => s.charger_id === c.id)
   );
+
+  const hasEnabledSchemas = schemas.some((s) => s.enabled);
 
   if (loading) {
     return (
@@ -199,7 +247,10 @@ export default function SchemaManager() {
         </h2>
         <p className="text-gray-600">
           Add a charger on the{" "}
-          <a href="/account" className="text-green-600 hover:text-green-700 underline">
+          <a
+            href="/account"
+            className="text-green-600 hover:text-green-700 underline"
+          >
             Chargers page
           </a>{" "}
           first before creating a charging schema.
@@ -216,7 +267,10 @@ export default function SchemaManager() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Add Charging Schema
           </h2>
-          <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end">
+          <form
+            onSubmit={handleSave}
+            className="flex flex-col sm:flex-row gap-4 items-end"
+          >
             <div className="flex-1">
               <label
                 htmlFor="charger-select"
@@ -227,7 +281,11 @@ export default function SchemaManager() {
               <select
                 id="charger-select"
                 value={selectedCharger}
-                onChange={(e) => setSelectedCharger(e.target.value ? parseInt(e.target.value) : "")}
+                onChange={(e) =>
+                  setSelectedCharger(
+                    e.target.value ? parseInt(e.target.value) : ""
+                  )
+                }
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900 bg-white"
               >
@@ -268,6 +326,165 @@ export default function SchemaManager() {
           </form>
           {saveError && (
             <p className="mt-3 text-sm text-red-600">{saveError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Apply Now */}
+      {hasEnabledSchemas && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Apply to Easee
+              </h2>
+              <p className="text-sm text-gray-500">
+                Check the current price and start or pause your chargers
+                accordingly.
+              </p>
+            </div>
+            <button
+              onClick={handleApply}
+              disabled={applying}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {applying ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Applying...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Apply Now
+                </>
+              )}
+            </button>
+          </div>
+
+          {applyError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-700">{applyError}</p>
+            </div>
+          )}
+
+          {applyResults && (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-500">
+                Current price:{" "}
+                <span className="font-semibold text-gray-900">
+                  &euro;{applyResults.currentPrice.toFixed(4)}/kWh
+                </span>
+                <span className="mx-2">&middot;</span>
+                Applied at{" "}
+                {new Date(applyResults.timestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </div>
+              {applyResults.results.map((r) => (
+                <div
+                  key={r.schemaId}
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${
+                    r.actionResult === "success"
+                      ? "bg-green-50 border-green-200"
+                      : r.actionResult === "error"
+                        ? "bg-red-50 border-red-200"
+                        : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      r.actionResult === "success"
+                        ? "bg-green-500"
+                        : r.actionResult === "error"
+                          ? "bg-red-500"
+                          : "bg-gray-400"
+                    }`}
+                  >
+                    {r.actionResult === "success" ? (
+                      <svg
+                        className="h-3 w-3 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ) : r.actionResult === "error" ? (
+                      <svg
+                        className="h-3 w-3 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-3 w-3 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M20 12H4"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {r.chargerName}
+                    </p>
+                    <p className="text-sm text-gray-600">{r.message}</p>
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  To automate this, set up a cron job to{" "}
+                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+                    POST /api/schemas/apply
+                  </code>{" "}
+                  every hour. The endpoint checks the current Tibber price
+                  against your max price and sends start/pause commands to Easee.
+                </p>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -410,7 +627,12 @@ function SchemaCard({
               className="text-gray-400 hover:text-red-600 transition-colors"
               title="Delete schema"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -518,7 +740,9 @@ function SchemaCard({
                 {slots.map((slot, i) => {
                   const now = new Date();
                   const slotStart = new Date(slot.startsAt);
-                  const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+                  const slotEnd = new Date(
+                    slotStart.getTime() + 60 * 60 * 1000
+                  );
                   const isNow = now >= slotStart && now < slotEnd;
 
                   return (
@@ -541,9 +765,15 @@ function SchemaCard({
                       {/* Tooltip */}
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
                         <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                          <p className="font-medium">{formatTime(slot.startsAt)}</p>
+                          <p className="font-medium">
+                            {formatTime(slot.startsAt)}
+                          </p>
                           <p>&euro;{slot.price.toFixed(4)}/kWh</p>
-                          <p className={slot.active ? "text-green-400" : "text-red-400"}>
+                          <p
+                            className={
+                              slot.active ? "text-green-400" : "text-red-400"
+                            }
+                          >
                             {slot.active ? "Charging" : "Paused"}
                           </p>
                         </div>
