@@ -48,4 +48,17 @@ export async function initializeDatabase() {
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )
   `;
+
+  await db`
+    CREATE TABLE IF NOT EXISTS charging_schemas (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      charger_id INTEGER REFERENCES chargers(id) ON DELETE CASCADE,
+      max_price NUMERIC(10, 4) NOT NULL,
+      enabled BOOLEAN DEFAULT true,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, charger_id)
+    )
+  `;
 }

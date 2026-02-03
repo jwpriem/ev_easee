@@ -32,6 +32,12 @@ export default async function PricesPage() {
               >
                 Prices
               </Link>
+              <Link
+                href="/schema"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Schema
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-4">

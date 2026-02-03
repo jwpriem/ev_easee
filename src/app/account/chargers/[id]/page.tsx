@@ -160,6 +160,12 @@ export default function ChargerDetailPage({
               >
                 Prices
               </Link>
+              <Link
+                href="/schema"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Schema
+              </Link>
             </div>
           </div>
           <Link
