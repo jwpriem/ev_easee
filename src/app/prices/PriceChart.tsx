@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Cell,
+  ReferenceDot,
 } from "recharts";
 
 interface TibberPrice {
@@ -484,13 +484,41 @@ export default function PriceChart() {
           ))}
         </div>
 
-        {/* Recharts Bar Chart */}
+        {/* Recharts Area Chart */}
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
+            <AreaChart
               data={chartData}
               margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
             >
+              <defs>
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="1" y2="0">
+                  {chartData.map((entry, i) => {
+                    const pct = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 0;
+                    return (
+                      <stop
+                        key={i}
+                        offset={`${pct}%`}
+                        stopColor={getLevelColor(entry.level)}
+                        stopOpacity={0.85}
+                      />
+                    );
+                  })}
+                </linearGradient>
+                <linearGradient id="priceFill" x1="0" y1="0" x2="1" y2="0">
+                  {chartData.map((entry, i) => {
+                    const pct = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 0;
+                    return (
+                      <stop
+                        key={i}
+                        offset={`${pct}%`}
+                        stopColor={getLevelColor(entry.level)}
+                        stopOpacity={0.25}
+                      />
+                    );
+                  })}
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
@@ -552,23 +580,25 @@ export default function PriceChart() {
                   fontSize: 11,
                 }}
               />
-              <Bar
+              <Area
+                type="stepAfter"
                 dataKey="price"
-                radius={[2, 2, 0, 0]}
-                maxBarSize={resolution === "15" ? 8 : 20}
+                stroke="url(#priceGradient)"
+                strokeWidth={2}
+                fill="url(#priceFill)"
                 isAnimationActive={false}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={index}
-                    fill={getLevelColor(entry.level)}
-                    opacity={entry.isNow ? 1 : 0.75}
-                    stroke={entry.isNow ? "#000" : "none"}
-                    strokeWidth={entry.isNow ? 2 : 0}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              />
+              {currentPrice && (
+                <ReferenceDot
+                  x={currentPrice.time}
+                  y={currentPrice.price}
+                  r={6}
+                  fill={getLevelColor(currentPrice.level)}
+                  stroke="#fff"
+                  strokeWidth={2}
+                />
+              )}
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
