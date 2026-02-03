@@ -79,12 +79,37 @@ export default function PriceChart() {
   const [resolution, setResolution] = useState<Resolution>("60");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notConnected, setNotConnected] = useState(false);
+  const [tibberConnected, setTibberConnected] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
-    async function fetchPrices() {
+    async function fetchData() {
       try {
+        // Check Tibber connection status
+        const statusRes = await fetch("/api/tibber/status");
+        const statusData = await statusRes.json();
+
+        if (!statusRes.ok && statusRes.status === 401) {
+          return;
+        }
+
+        setTibberConnected(statusData.connected);
+
+        if (!statusData.connected) {
+          setNotConnected(true);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch prices
         const response = await fetch("/api/prices");
         const data = await response.json();
+
+        if (response.status === 400) {
+          setNotConnected(true);
+          return;
+        }
 
         if (!response.ok) {
           setError(data.error || "Failed to fetch prices");
@@ -100,8 +125,26 @@ export default function PriceChart() {
       }
     }
 
-    fetchPrices();
+    fetchData();
   }, []);
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/tibber/disconnect", { method: "POST" });
+      if (res.ok) {
+        setTibberConnected(false);
+        setNotConnected(true);
+        setTodayPrices([]);
+        setTomorrowPrices([]);
+        setError("");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   const chartData = useMemo(() => {
     const allPrices = [...todayPrices, ...tomorrowPrices];
@@ -154,6 +197,52 @@ export default function PriceChart() {
     );
   }
 
+  if (notConnected) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+        <svg
+          className="mx-auto h-16 w-16 text-gray-400 mb-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        </svg>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          Connect Your Tibber Account
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Connect your Tibber account to view real-time electricity prices for
+          your home.
+        </p>
+        <a
+          href="/api/tibber/authorize"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+            />
+          </svg>
+          Connect Tibber
+        </a>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-8">
@@ -190,6 +279,25 @@ export default function PriceChart() {
 
   return (
     <div className="space-y-6">
+      {/* Tibber Connection Status */}
+      {tibberConnected && (
+        <div className="flex items-center justify-between bg-white rounded-xl shadow-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
+            <span className="text-sm text-gray-700 font-medium">
+              Tibber connected
+            </span>
+          </div>
+          <button
+            onClick={handleDisconnect}
+            disabled={disconnecting}
+            className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
+          >
+            {disconnecting ? "Disconnecting..." : "Disconnect"}
+          </button>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-lg p-4">

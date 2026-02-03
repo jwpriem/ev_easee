@@ -3,13 +3,20 @@ import Link from "next/link";
 import { getSession } from "@/lib/session";
 import LogoutButton from "../account/LogoutButton";
 import PriceChart from "./PriceChart";
+import ConnectedBanner from "./ConnectedBanner";
 
-export default async function PricesPage() {
+export default async function PricesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ connected?: string; error?: string }>;
+}) {
   const session = await getSession();
 
   if (!session) {
     redirect("/login");
   }
+
+  const params = await searchParams;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -46,6 +53,12 @@ export default async function PricesPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">
             Energy Prices
           </h1>
+          {params.connected === "true" && <ConnectedBanner />}
+          {params.error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-red-800">{params.error}</p>
+            </div>
+          )}
           <PriceChart />
         </div>
       </main>
