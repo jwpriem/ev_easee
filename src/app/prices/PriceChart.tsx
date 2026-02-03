@@ -518,6 +518,7 @@ export default function PriceChart() {
                 dataKey="price"
                 radius={[2, 2, 0, 0]}
                 maxBarSize={resolution === "15" ? 8 : 20}
+                isAnimationActive={false}
               >
                 {chartData.map((entry, index) => (
                   <Cell

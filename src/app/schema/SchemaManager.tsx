@@ -79,10 +79,12 @@ export default function SchemaManager() {
       ]);
 
       if (chargersRes.ok) {
-        setChargers(await chargersRes.json());
+        const chargersData = await chargersRes.json();
+        setChargers(chargersData.chargers || chargersData);
       }
       if (schemasRes.ok) {
-        setSchemas(await schemasRes.json());
+        const schemasData = await schemasRes.json();
+        setSchemas(Array.isArray(schemasData) ? schemasData : []);
       }
 
       // Load schedules
