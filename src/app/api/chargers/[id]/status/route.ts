@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import { getSession } from '@/lib/session';
-import { EaseeClient, decryptToken, CHARGER_OP_MODES } from '@/lib/easee';
+import { EaseeClient, decryptToken, persistRefreshedTokens, CHARGER_OP_MODES } from '@/lib/easee';
 
 export async function GET(
   request: Request,
@@ -57,6 +57,9 @@ export async function GET(
       client.setTokens(accessToken, refreshToken);
 
       const state = await client.getChargerState(charger.charger_id);
+
+      // Persist refreshed tokens back to DB so they don't expire
+      await persistRefreshedTokens(client, charger.id);
 
       return NextResponse.json({
         charger: {

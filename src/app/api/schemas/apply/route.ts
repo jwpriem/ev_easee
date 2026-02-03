@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { fetchTibberPrices } from '@/lib/tibber';
-import { EaseeClient, decryptToken } from '@/lib/easee';
+import { EaseeClient, decryptToken, persistRefreshedTokens } from '@/lib/easee';
 import getDb from '@/lib/db';
 
 interface ApplyResult {
@@ -156,6 +156,8 @@ export async function POST() {
             result.message = 'Not currently charging — no action needed.';
           }
         }
+        // Persist refreshed tokens back to DB so they don't expire
+        await persistRefreshedTokens(client, schema.charger_id);
       } catch (error) {
         result.actionResult = 'error';
         result.message = error instanceof Error ? error.message : 'Failed to control charger';
