@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import LogoutButton from "./LogoutButton";
-import ChargerList from "./ChargerList";
+import LogoutButton from "../account/LogoutButton";
+import PriceChart from "./PriceChart";
 
-export default async function AccountPage() {
+export default async function PricesPage() {
   const session = await getSession();
 
   if (!session) {
@@ -22,13 +22,13 @@ export default async function AccountPage() {
             <div className="flex items-center gap-4">
               <Link
                 href="/account"
-                className="text-green-600 font-medium"
+                className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Chargers
               </Link>
               <Link
                 href="/prices"
-                className="text-gray-600 hover:text-gray-900 font-medium"
+                className="text-green-600 font-medium"
               >
                 Prices
               </Link>
@@ -42,9 +42,11 @@ export default async function AccountPage() {
       </header>
 
       <main className="flex-1 py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">My Chargers</h1>
-          <ChargerList />
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">
+            Energy Prices
+          </h1>
+          <PriceChart />
         </div>
       </main>
     </div>
