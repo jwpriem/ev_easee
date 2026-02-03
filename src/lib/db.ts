@@ -61,4 +61,22 @@ export async function initializeDatabase() {
       UNIQUE(user_id, charger_id)
     )
   `;
+
+  await db`
+    CREATE TABLE IF NOT EXISTS automation_settings (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      cron_api_key VARCHAR(64) NOT NULL,
+      app_url TEXT,
+      encrypted_do_token TEXT,
+      do_namespace_id VARCHAR(255),
+      do_api_host TEXT,
+      encrypted_do_key TEXT,
+      do_function_name VARCHAR(255),
+      do_trigger_name VARCHAR(255),
+      active BOOLEAN DEFAULT false,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 }

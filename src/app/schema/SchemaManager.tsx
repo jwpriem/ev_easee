@@ -35,6 +35,8 @@ interface Schedule {
   enabled: boolean;
   slots: Slot[];
   summary: {
+    activeSlots: number;
+    totalSlots: number;
     activeHours: number;
     totalHours: number;
     cheapestPrice: number;
@@ -58,6 +60,14 @@ interface ApplyResponse {
   results: ApplyResult[];
   currentPrice: number;
   timestamp: string;
+}
+
+interface AutomationStatus {
+  active: boolean;
+  cronApiKey?: string;
+  doConfigured: boolean;
+  triggerName?: string;
+  namespaceId?: string;
 }
 
 function formatTime(isoString: string): string {
@@ -92,8 +102,18 @@ export default function SchemaManager() {
   const [applyResults, setApplyResults] = useState<ApplyResponse | null>(null);
   const [applyError, setApplyError] = useState("");
 
+  // Automation state
+  const [automationStatus, setAutomationStatus] =
+    useState<AutomationStatus | null>(null);
+  const [automationLoading, setAutomationLoading] = useState(false);
+  const [automationError, setAutomationError] = useState("");
+  const [doToken, setDoToken] = useState("");
+  const [appUrl, setAppUrl] = useState("");
+  const [showDoSetup, setShowDoSetup] = useState(false);
+
   useEffect(() => {
     loadData();
+    loadAutomationStatus();
   }, []);
 
   async function loadData() {
@@ -124,6 +144,18 @@ export default function SchemaManager() {
       setError("Failed to load data");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadAutomationStatus() {
+    try {
+      const res = await fetch("/api/automation/status");
+      if (res.ok) {
+        const data = await res.json();
+        setAutomationStatus(data);
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -198,6 +230,68 @@ export default function SchemaManager() {
       setApplyError("Failed to connect to server");
     } finally {
       setApplying(false);
+    }
+  }
+
+  async function handleSetupAutomation(e: React.FormEvent) {
+    e.preventDefault();
+    setAutomationLoading(true);
+    setAutomationError("");
+    try {
+      const res = await fetch("/api/automation/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doApiToken: doToken, appUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAutomationError(data.error || "Failed to set up automation");
+        return;
+      }
+      setDoToken("");
+      setShowDoSetup(false);
+      setAutomationStatus(data);
+    } catch {
+      setAutomationError("Failed to connect to server");
+    } finally {
+      setAutomationLoading(false);
+    }
+  }
+
+  async function handleStopAutomation() {
+    setAutomationLoading(true);
+    setAutomationError("");
+    try {
+      const res = await fetch("/api/automation/stop", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAutomationError(data.error || "Failed to stop automation");
+        return;
+      }
+      setAutomationStatus(data);
+    } catch {
+      setAutomationError("Failed to connect to server");
+    } finally {
+      setAutomationLoading(false);
+    }
+  }
+
+  async function handleDeleteAutomation() {
+    if (!confirm("Delete the automation? This will remove the DigitalOcean Function and all settings.")) return;
+    setAutomationLoading(true);
+    setAutomationError("");
+    try {
+      const res = await fetch("/api/automation/delete", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAutomationError(data.error || "Failed to delete automation");
+        return;
+      }
+      setAutomationStatus(data);
+    } catch {
+      setAutomationError("Failed to connect to server");
+    } finally {
+      setAutomationLoading(false);
     }
   }
 
@@ -330,7 +424,7 @@ export default function SchemaManager() {
         </div>
       )}
 
-      {/* Apply Now */}
+      {/* Apply & Automation */}
       {hasEnabledSchemas && (
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
@@ -387,7 +481,7 @@ export default function SchemaManager() {
           )}
 
           {applyResults && (
-            <div className="space-y-3">
+            <div className="space-y-3 mb-6">
               <div className="text-sm text-gray-500">
                 Current price:{" "}
                 <span className="font-semibold text-gray-900">
@@ -473,19 +567,198 @@ export default function SchemaManager() {
                   </div>
                 </div>
               ))}
-
-              <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500">
-                  To automate this, set up a cron job to{" "}
-                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
-                    POST /api/schemas/apply
-                  </code>{" "}
-                  every hour. The endpoint checks the current Tibber price
-                  against your max price and sends start/pause commands to Easee.
-                </p>
-              </div>
             </div>
           )}
+
+          {/* Automation Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">
+                  Automated Scheduling (every 15 min)
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Uses DigitalOcean Functions to automatically apply your schemas every 15 minutes.
+                </p>
+              </div>
+              {automationStatus?.active && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  Active
+                </span>
+              )}
+            </div>
+
+            {automationError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                <p className="text-sm text-red-700">{automationError}</p>
+              </div>
+            )}
+
+            {automationStatus?.active ? (
+              <div className="space-y-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    Your schemas are being applied automatically every 15 minutes via DigitalOcean Functions.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleStopAutomation}
+                    disabled={automationLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white text-sm font-medium rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50"
+                  >
+                    {automationLoading ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    Pause Automation
+                  </button>
+                  <button
+                    onClick={handleDeleteAutomation}
+                    disabled={automationLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {automationLoading ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                    Delete Automation
+                  </button>
+                </div>
+              </div>
+            ) : automationStatus && !automationStatus.active && automationStatus.doConfigured ? (
+              <div className="space-y-3">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    Automation is paused. Click below to re-enable it.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setAutomationLoading(true);
+                      setAutomationError("");
+                      try {
+                        const res = await fetch("/api/automation/resume", { method: "POST" });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setAutomationError(data.error || "Failed to resume");
+                          return;
+                        }
+                        setAutomationStatus(data);
+                      } catch {
+                        setAutomationError("Failed to connect to server");
+                      } finally {
+                        setAutomationLoading(false);
+                      }
+                    }}
+                    disabled={automationLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {automationLoading ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      </svg>
+                    )}
+                    Resume Automation
+                  </button>
+                  <button
+                    onClick={handleDeleteAutomation}
+                    disabled={automationLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {automationLoading ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                    Delete Automation
+                  </button>
+                </div>
+              </div>
+            ) : showDoSetup ? (
+              <form onSubmit={handleSetupAutomation} className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    DigitalOcean API Token
+                  </label>
+                  <input
+                    type="password"
+                    value={doToken}
+                    onChange={(e) => setDoToken(e.target.value)}
+                    placeholder="dop_v1_..."
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Create a token at{" "}
+                    <a
+                      href="https://cloud.digitalocean.com/account/api/tokens"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-700 underline"
+                    >
+                      DigitalOcean API Settings
+                    </a>
+                    {" "}with read/write access to Functions.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Application URL
+                  </label>
+                  <input
+                    type="url"
+                    value={appUrl}
+                    onChange={(e) => setAppUrl(e.target.value)}
+                    placeholder="https://your-app.vercel.app"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    The public URL where this app is hosted. The DO Function will call this URL.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={automationLoading || !doToken || !appUrl}
+                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {automationLoading ? "Setting up..." : "Set Up Automation"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDoSetup(false)}
+                    className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowDoSetup(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Set Up Automated Scheduling
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -697,18 +970,18 @@ function SchemaCard({
         {schedule && (
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="text-center p-2 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500">Active Hours</p>
+              <p className="text-xs text-gray-500">Active</p>
               <p className="text-lg font-bold text-green-600">
-                {schedule.summary.activeHours}
+                {schedule.summary.activeHours.toFixed(1)}h
                 <span className="text-sm font-normal text-gray-400">
-                  /{schedule.summary.totalHours}
+                  /{schedule.summary.totalHours.toFixed(1)}h
                 </span>
               </p>
             </div>
             <div className="text-center p-2 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500">Inactive Hours</p>
+              <p className="text-xs text-gray-500">Inactive</p>
               <p className="text-lg font-bold text-red-500">
-                {schedule.summary.totalHours - schedule.summary.activeHours}
+                {(schedule.summary.totalHours - schedule.summary.activeHours).toFixed(1)}h
               </p>
             </div>
             <div className="text-center p-2 bg-gray-50 rounded-lg">
@@ -727,21 +1000,21 @@ function SchemaCard({
         )}
       </div>
 
-      {/* Schedule Timeline */}
+      {/* Schedule Timeline - 15 minute slots */}
       {schedule && schedule.slots.length > 0 && (
         <div className="p-6">
           <h4 className="text-sm font-semibold text-gray-700 mb-4">
-            Charging Schedule
+            Charging Schedule (15-min intervals)
           </h4>
           {Object.entries(slotsByDay).map(([day, slots]) => (
             <div key={day} className="mb-4 last:mb-0">
               <p className="text-xs font-medium text-gray-500 mb-2">{day}</p>
-              <div className="flex gap-0.5">
+              <div className="flex gap-px">
                 {slots.map((slot, i) => {
                   const now = new Date();
                   const slotStart = new Date(slot.startsAt);
                   const slotEnd = new Date(
-                    slotStart.getTime() + 60 * 60 * 1000
+                    slotStart.getTime() + 15 * 60 * 1000
                   );
                   const isNow = now >= slotStart && now < slotEnd;
 
@@ -752,14 +1025,17 @@ function SchemaCard({
                       title={`${formatTime(slot.startsAt)}: €${slot.price.toFixed(4)}/kWh — ${slot.active ? "Charging" : "Paused"}`}
                     >
                       <div
-                        className={`h-8 rounded-sm transition-all ${
+                        className={`h-8 transition-all ${
+                          i === 0 ? "rounded-l-sm" : ""
+                        } ${i === slots.length - 1 ? "rounded-r-sm" : ""} ${
                           slot.active
                             ? "bg-green-500 hover:bg-green-600"
                             : "bg-red-300 hover:bg-red-400"
                         } ${isNow ? "ring-2 ring-offset-1 ring-gray-900" : ""}`}
                       />
+                      {/* Show time label every hour (every 4th slot) */}
                       <span className="text-[10px] text-gray-400 block text-center mt-0.5 leading-tight">
-                        {i % 3 === 0 ? formatTime(slot.startsAt) : ""}
+                        {i % 4 === 0 ? formatTime(slot.startsAt) : ""}
                       </span>
 
                       {/* Tooltip */}
