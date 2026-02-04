@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Cell,
+  ReferenceDot,
 } from "recharts";
 
 interface TibberPrice {
@@ -63,6 +63,38 @@ function interpolateTo15Min(prices: TibberPrice[]): TibberPrice[] {
     }
   }
   return result;
+}
+
+interface PriceBounds {
+  min: number;
+  max: number;
+  thresholds: [number, number, number, number]; // boundaries between the 5 levels
+}
+
+function computePriceBounds(prices: { total: number }[]): PriceBounds {
+  if (prices.length === 0) return { min: 0, max: 0, thresholds: [0, 0, 0, 0] };
+  const min = Math.min(...prices.map((p) => p.total));
+  const max = Math.max(...prices.map((p) => p.total));
+  const range = max - min;
+  return {
+    min,
+    max,
+    thresholds: [
+      min + range * 0.2,
+      min + range * 0.4,
+      min + range * 0.6,
+      min + range * 0.8,
+    ],
+  };
+}
+
+function computeLevel(price: number, bounds: PriceBounds): string {
+  if (bounds.min === bounds.max) return "NORMAL";
+  if (price <= bounds.thresholds[0]) return "VERY_CHEAP";
+  if (price <= bounds.thresholds[1]) return "CHEAP";
+  if (price <= bounds.thresholds[2]) return "NORMAL";
+  if (price <= bounds.thresholds[3]) return "EXPENSIVE";
+  return "VERY_EXPENSIVE";
 }
 
 interface ChartEntry {
@@ -176,6 +208,11 @@ export default function PriceChart() {
     }
   }
 
+  const priceBounds = useMemo(() => {
+    const allPrices = [...todayPrices, ...tomorrowPrices];
+    return computePriceBounds(allPrices);
+  }, [todayPrices, tomorrowPrices]);
+
   const chartData = useMemo(() => {
     const allPrices = [...todayPrices, ...tomorrowPrices];
     const prices =
@@ -193,12 +230,12 @@ export default function PriceChart() {
       return {
         time: formatTime(p.startsAt),
         price: p.total,
-        level: p.level,
+        level: computeLevel(p.total, priceBounds),
         startsAt: p.startsAt,
         isNow,
       };
     });
-  }, [todayPrices, tomorrowPrices, resolution]);
+  }, [todayPrices, tomorrowPrices, resolution, priceBounds]);
 
   const avgPrice = useMemo(() => {
     if (chartData.length === 0) return 0;
@@ -427,14 +464,14 @@ export default function PriceChart() {
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 mb-4 text-xs">
+        {/* Legend with price ranges */}
+        <div className="flex flex-wrap gap-x-5 gap-y-1 mb-4 text-xs">
           {[
-            { level: "VERY_CHEAP", label: "Very Cheap" },
-            { level: "CHEAP", label: "Cheap" },
-            { level: "NORMAL", label: "Normal" },
-            { level: "EXPENSIVE", label: "Expensive" },
-            { level: "VERY_EXPENSIVE", label: "Very Expensive" },
+            { level: "VERY_CHEAP", label: "Very Cheap", range: `\u2264 \u20AC${priceBounds.thresholds[0].toFixed(4)}` },
+            { level: "CHEAP", label: "Cheap", range: `\u2264 \u20AC${priceBounds.thresholds[1].toFixed(4)}` },
+            { level: "NORMAL", label: "Normal", range: `\u2264 \u20AC${priceBounds.thresholds[2].toFixed(4)}` },
+            { level: "EXPENSIVE", label: "Expensive", range: `\u2264 \u20AC${priceBounds.thresholds[3].toFixed(4)}` },
+            { level: "VERY_EXPENSIVE", label: "Very Expensive", range: `> \u20AC${priceBounds.thresholds[3].toFixed(4)}` },
           ].map((item) => (
             <div key={item.level} className="flex items-center gap-1.5">
               <div
@@ -442,17 +479,46 @@ export default function PriceChart() {
                 style={{ backgroundColor: getLevelColor(item.level) }}
               />
               <span className="text-gray-600">{item.label}</span>
+              <span className="text-gray-400">{item.range}</span>
             </div>
           ))}
         </div>
 
-        {/* Recharts Bar Chart */}
+        {/* Recharts Area Chart */}
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
+            <AreaChart
               data={chartData}
               margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
             >
+              <defs>
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="1" y2="0">
+                  {chartData.map((entry, i) => {
+                    const pct = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 0;
+                    return (
+                      <stop
+                        key={i}
+                        offset={`${pct}%`}
+                        stopColor={getLevelColor(entry.level)}
+                        stopOpacity={0.85}
+                      />
+                    );
+                  })}
+                </linearGradient>
+                <linearGradient id="priceFill" x1="0" y1="0" x2="1" y2="0">
+                  {chartData.map((entry, i) => {
+                    const pct = chartData.length > 1 ? (i / (chartData.length - 1)) * 100 : 0;
+                    return (
+                      <stop
+                        key={i}
+                        offset={`${pct}%`}
+                        stopColor={getLevelColor(entry.level)}
+                        stopOpacity={0.25}
+                      />
+                    );
+                  })}
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
@@ -514,23 +580,25 @@ export default function PriceChart() {
                   fontSize: 11,
                 }}
               />
-              <Bar
+              <Area
+                type="stepAfter"
                 dataKey="price"
-                radius={[2, 2, 0, 0]}
-                maxBarSize={resolution === "15" ? 8 : 20}
+                stroke="url(#priceGradient)"
+                strokeWidth={2}
+                fill="url(#priceFill)"
                 isAnimationActive={false}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={index}
-                    fill={getLevelColor(entry.level)}
-                    opacity={entry.isNow ? 1 : 0.75}
-                    stroke={entry.isNow ? "#000" : "none"}
-                    strokeWidth={entry.isNow ? 2 : 0}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              />
+              {currentPrice && (
+                <ReferenceDot
+                  x={currentPrice.time}
+                  y={currentPrice.price}
+                  r={6}
+                  fill={getLevelColor(currentPrice.level)}
+                  stroke="#fff"
+                  strokeWidth={2}
+                />
+              )}
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>

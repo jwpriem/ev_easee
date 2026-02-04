@@ -106,6 +106,15 @@ export const CHARGER_OP_MODES: Record<number, string> = {
 export class EaseeClient {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+  private _tokensRefreshed = false;
+
+  get tokensRefreshed(): boolean {
+    return this._tokensRefreshed;
+  }
+
+  getTokens(): { accessToken: string | null; refreshToken: string | null } {
+    return { accessToken: this.accessToken, refreshToken: this.refreshToken };
+  }
 
   async login(username: string, password: string): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; error?: string }> {
     try {
@@ -212,6 +221,7 @@ export class EaseeClient {
       // Try to refresh token
       const refreshResult = await this.refreshAccessToken();
       if (refreshResult.success) {
+        this._tokensRefreshed = true;
         // Retry the request
         const retryResponse = await fetch(`${EASEE_BASE_URL}${endpoint}`, {
           ...options,
@@ -298,6 +308,26 @@ export function decryptToken(encryptedToken: string): string {
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
+}
+
+export async function persistRefreshedTokens(
+  client: EaseeClient,
+  chargerId: number
+): Promise<void> {
+  if (!client.tokensRefreshed) return;
+  const { default: getDb } = await import('@/lib/db');
+  const sql = getDb();
+  const tokens = client.getTokens();
+  if (tokens.accessToken) {
+    const encAccess = encryptToken(tokens.accessToken);
+    const encRefresh = tokens.refreshToken ? encryptToken(tokens.refreshToken) : null;
+    await sql`
+      UPDATE chargers
+      SET encrypted_access_token = ${encAccess},
+          encrypted_refresh_token = ${encRefresh}
+      WHERE id = ${chargerId}
+    `;
+  }
 }
 
 export type { EaseeCharger, EaseeSite, EaseeCircuit, EaseeChargerState };
