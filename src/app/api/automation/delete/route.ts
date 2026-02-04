@@ -11,9 +11,14 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const doToken = process.env.DO_API_TOKEN;
+    if (!doToken) {
+      return NextResponse.json({ error: 'DO_API_TOKEN environment variable is required.' }, { status: 400 });
+    }
+
     const sql = getDb();
     const rows = await sql`
-      SELECT encrypted_do_token, do_namespace_id, do_api_host, encrypted_do_key,
+      SELECT do_namespace_id, do_api_host, encrypted_do_key,
              do_function_name, do_trigger_name
       FROM automation_settings
       WHERE user_id = ${session.userId}
@@ -25,8 +30,7 @@ export async function POST() {
 
     const settings = rows[0];
 
-    if (settings.encrypted_do_token && settings.do_namespace_id) {
-      const doToken = decryptToken(settings.encrypted_do_token);
+    if (settings.do_namespace_id) {
 
       // Delete trigger
       if (settings.do_trigger_name) {

@@ -14,27 +14,18 @@ const PACKAGE_NAME = 'ev-easee';
 const FUNCTION_NAME = 'apply-schema';
 const TRIGGER_NAME = 'every-15-min';
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { doApiToken, appUrl } = await request.json();
+    const doApiToken = process.env.DO_API_TOKEN;
+    const appUrl = process.env.APP_URL;
     if (!doApiToken || !appUrl) {
       return NextResponse.json(
-        { error: 'DigitalOcean API token and application URL are required.' },
-        { status: 400 }
-      );
-    }
-
-    // Validate app URL format
-    try {
-      new URL(appUrl);
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid application URL.' },
+        { error: 'DO_API_TOKEN and APP_URL environment variables are required.' },
         { status: 400 }
       );
     }
@@ -72,24 +63,21 @@ export async function POST(request: Request) {
     );
 
     // Store settings in DB
-    const encryptedDoToken = encryptToken(doApiToken);
     const encryptedDoKey = encryptToken(namespace.key);
 
     await sql`
       INSERT INTO automation_settings (
-        user_id, cron_api_key, app_url, encrypted_do_token,
+        user_id, cron_api_key,
         do_namespace_id, do_api_host, encrypted_do_key,
         do_function_name, do_trigger_name, active
       )
       VALUES (
-        ${session.userId}, ${cronApiKey}, ${appUrl}, ${encryptedDoToken},
+        ${session.userId}, ${cronApiKey},
         ${namespace.uuid}, ${namespace.api_host}, ${encryptedDoKey},
         ${`${PACKAGE_NAME}/${FUNCTION_NAME}`}, ${TRIGGER_NAME}, true
       )
       ON CONFLICT (user_id) DO UPDATE SET
         cron_api_key = EXCLUDED.cron_api_key,
-        app_url = EXCLUDED.app_url,
-        encrypted_do_token = EXCLUDED.encrypted_do_token,
         do_namespace_id = EXCLUDED.do_namespace_id,
         do_api_host = EXCLUDED.do_api_host,
         encrypted_do_key = EXCLUDED.encrypted_do_key,

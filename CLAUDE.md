@@ -54,6 +54,8 @@ Passwords are hashed with bcryptjs (10 rounds). Sessions are base64 JSON cookies
 ```
 DATABASE_URL          # Neon PostgreSQL connection string
 TOKEN_ENCRYPTION_KEY  # 32+ char key for AES-256-CBC token encryption
+DO_API_TOKEN          # DigitalOcean API token (for Functions automation)
+APP_URL               # Public application URL (used by DO Functions to call the cron endpoint)
 ```
 
 ### Path Alias

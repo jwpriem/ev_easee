@@ -107,9 +107,6 @@ export default function SchemaManager() {
     useState<AutomationStatus | null>(null);
   const [automationLoading, setAutomationLoading] = useState(false);
   const [automationError, setAutomationError] = useState("");
-  const [doToken, setDoToken] = useState("");
-  const [appUrl, setAppUrl] = useState("");
-  const [showDoSetup, setShowDoSetup] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -233,23 +230,18 @@ export default function SchemaManager() {
     }
   }
 
-  async function handleSetupAutomation(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSetupAutomation() {
     setAutomationLoading(true);
     setAutomationError("");
     try {
       const res = await fetch("/api/automation/setup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doApiToken: doToken, appUrl }),
       });
       const data = await res.json();
       if (!res.ok) {
         setAutomationError(data.error || "Failed to set up automation");
         return;
       }
-      setDoToken("");
-      setShowDoSetup(false);
       setAutomationStatus(data);
     } catch {
       setAutomationError("Failed to connect to server");
@@ -687,75 +679,25 @@ export default function SchemaManager() {
                   </button>
                 </div>
               </div>
-            ) : showDoSetup ? (
-              <form onSubmit={handleSetupAutomation} className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DigitalOcean API Token
-                  </label>
-                  <input
-                    type="password"
-                    value={doToken}
-                    onChange={(e) => setDoToken(e.target.value)}
-                    placeholder="dop_v1_..."
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Create a token at{" "}
-                    <a
-                      href="https://cloud.digitalocean.com/account/api/tokens"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-700 underline"
-                    >
-                      DigitalOcean API Settings
-                    </a>
-                    {" "}with read/write access to Functions.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Application URL
-                  </label>
-                  <input
-                    type="url"
-                    value={appUrl}
-                    onChange={(e) => setAppUrl(e.target.value)}
-                    placeholder="https://your-app.vercel.app"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    The public URL where this app is hosted. The DO Function will call this URL.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={automationLoading || !doToken || !appUrl}
-                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  >
-                    {automationLoading ? "Setting up..." : "Set Up Automation"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDoSetup(false)}
-                    className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
             ) : (
               <button
-                onClick={() => setShowDoSetup(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={handleSetupAutomation}
+                disabled={automationLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Set Up Automated Scheduling
+                {automationLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Setting up...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Set Up Automated Scheduling
+                  </>
+                )}
               </button>
             )}
           </div>

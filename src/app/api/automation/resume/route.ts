@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { decryptToken } from '@/lib/easee';
 import getDb from '@/lib/db';
 import { updateTrigger } from '@/lib/digitalocean';
 
@@ -11,9 +10,14 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const doToken = process.env.DO_API_TOKEN;
+    if (!doToken) {
+      return NextResponse.json({ error: 'DO_API_TOKEN environment variable is required.' }, { status: 400 });
+    }
+
     const sql = getDb();
     const rows = await sql`
-      SELECT encrypted_do_token, do_namespace_id, do_trigger_name
+      SELECT do_namespace_id, do_trigger_name
       FROM automation_settings
       WHERE user_id = ${session.userId}
     `;
@@ -24,8 +28,7 @@ export async function POST() {
 
     const settings = rows[0];
 
-    if (settings.encrypted_do_token && settings.do_namespace_id && settings.do_trigger_name) {
-      const doToken = decryptToken(settings.encrypted_do_token);
+    if (settings.do_namespace_id && settings.do_trigger_name) {
       await updateTrigger(doToken, settings.do_namespace_id, settings.do_trigger_name, true);
     }
 
