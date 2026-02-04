@@ -45,6 +45,18 @@ export default function ChargerDetailPage({
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
+  // Reconnect state
+  const [showReconnect, setShowReconnect] = useState(false);
+  const [reconnectUsername, setReconnectUsername] = useState("");
+  const [reconnectPassword, setReconnectPassword] = useState("");
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectError, setReconnectError] = useState("");
+  const [reconnectSuccess, setReconnectSuccess] = useState(false);
+
+  // Delete state
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   async function loadChargerStatus() {
     try {
       const response = await fetch(
@@ -84,6 +96,59 @@ export default function ChargerDetailPage({
   function handleRefresh() {
     setRefreshing(true);
     loadChargerStatus();
+  }
+
+  async function handleReconnect(e: React.FormEvent) {
+    e.preventDefault();
+    setReconnecting(true);
+    setReconnectError("");
+    setReconnectSuccess(false);
+    try {
+      const res = await fetch("/api/chargers", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chargerId: parseInt(resolvedParams.id),
+          username: reconnectUsername,
+          password: reconnectPassword,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setReconnectError(result.error || "Failed to reconnect");
+        return;
+      }
+      setReconnectSuccess(true);
+      setReconnectUsername("");
+      setReconnectPassword("");
+      setShowReconnect(false);
+      // Reload status with new tokens
+      setLoading(true);
+      loadChargerStatus();
+    } catch {
+      setReconnectError("Failed to connect to server");
+    } finally {
+      setReconnecting(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/chargers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargerId: parseInt(resolvedParams.id) }),
+      });
+      if (res.ok) {
+        router.push("/account");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   }
 
   function getStatusColor(opMode: number): string {
@@ -385,6 +450,119 @@ export default function ChargerDetailPage({
               </p>
             </div>
           )}
+
+          {/* Manage Charger */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Manage Charger
+            </h2>
+
+            {reconnectSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-green-800">
+                  Charger reconnected successfully. Tokens have been refreshed.
+                </p>
+              </div>
+            )}
+
+            {/* Reconnect */}
+            {showReconnect ? (
+              <form onSubmit={handleReconnect} className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  Re-connect Easee Account
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Enter your Easee credentials to refresh the authentication tokens.
+                </p>
+                <div className="space-y-3 max-w-sm">
+                  <input
+                    type="text"
+                    placeholder="Easee username / email"
+                    value={reconnectUsername}
+                    onChange={(e) => setReconnectUsername(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Easee password"
+                    value={reconnectPassword}
+                    onChange={(e) => setReconnectPassword(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-gray-900"
+                  />
+                  {reconnectError && (
+                    <p className="text-sm text-red-600">{reconnectError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={reconnecting || !reconnectUsername || !reconnectPassword}
+                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      {reconnecting ? "Connecting..." : "Re-connect"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReconnect(false);
+                        setReconnectError("");
+                      }}
+                      className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowReconnect(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors mb-4"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Re-connect Easee Account
+              </button>
+            )}
+
+            {/* Delete */}
+            <div className="border-t border-gray-200 pt-4">
+              {showDeleteConfirm ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800 mb-3">
+                    Are you sure you want to delete this charger? This will also remove any associated charging schemas. This action cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {deleting ? "Deleting..." : "Yes, Delete Charger"}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-gray-600 text-sm font-medium hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Charger
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </main>
     </div>
